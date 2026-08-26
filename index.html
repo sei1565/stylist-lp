@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stylist ｜ その服、似合ってるか聞いてから買う</title>
+<meta name="description" content="迷っている2パターンを出すと、みんながどっちが似合うか投票してくれる。結果は数字で返ってきます。">
+<meta property="og:title" content="Stylist ｜ その服、似合ってるか聞いてから買う">
+<meta property="og:description" content="迷っている2パターンを出すと、みんながどっちが似合うか投票してくれる。">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;600;900&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* TALLY ── 開票・集計の版面。装飾を足さず、面積と余白と一本の罫で構造を語る。
+     影・角丸・カードは使わない。数字がページで最も大きい要素になる。 */
+  :root{
+    --paper:#F7F5F2;
+    --ink:#141210;
+    --ink-2:#5C544E;      /* 紙地で 7:1 前後 */
+    --rule:rgba(20,18,16,.14);
+    --a:#C2455E;          /* 票A */
+    --b:#1F5F4E;          /* 票B */
+    --s1:8px; --s2:16px; --s3:24px; --s4:40px; --s5:64px; --s6:104px; --s7:128px;
+    --serif:"Noto Serif JP",serif;
+    --sans:"Zen Kaku Gothic New",-apple-system,BlinkMacSystemFont,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scrollbar-color:var(--ink-2) var(--paper)}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:var(--sans); font-weight:400; line-height:1.9;
+    font-size:16px; -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--ink); color:var(--paper)}
+  :focus-visible{outline:3px solid var(--a); outline-offset:4px}
+  img{display:block; max-width:100%; height:auto}
+
+  .sheet{width:min(1240px,100% - 48px); margin-inline:auto}
+  .rule{border:0; border-top:1px solid var(--rule); margin:0}
+
+  h1,h2{
+    font-family:var(--serif); font-weight:900; letter-spacing:-.03em; line-height:1.3; margin:0;
+    /* 日本語を語の途中で折らない。対応外のブラウザは通常の折り返しに戻る */
+    word-break:auto-phrase; line-break:strict; text-wrap:balance;
+  }
+  h1{font-size:clamp(34px,5vw,72px)}
+  h2{font-size:clamp(26px,3.2vw,44px)}
+  p{margin:0}
+  .body{color:var(--ink-2); font-size:17px; max-width:32em}
+
+  /* ── ヒーロー 7:5 の非対称。中央寄せは使わない ───────── */
+  .hero{display:grid; grid-template-columns:7fr 5fr; gap:var(--s5); padding:var(--s5) 0 var(--s6); align-items:start}
+  .mark{font-family:var(--serif); font-size:14px; font-weight:600; letter-spacing:.28em; margin:0 0 var(--s5)}
+  .hero h1{margin-bottom:var(--s3)}
+  .hero .body{margin-bottom:var(--s4)}
+
+  /* 図版は端末フレームを持たない。紙面に置かれた図として罫で囲うだけ */
+  figure{margin:0}
+  figure img{border:1px solid var(--rule); border-radius:4px}
+  figcaption{font-size:13px; color:var(--ink-2); margin-top:var(--s2); line-height:1.7}
+
+  /* ── 票（このページで最大の数字） ───────── */
+  .tally{margin:0 0 var(--s4)}
+  .tally-row{display:flex; align-items:baseline; gap:var(--s2); margin-bottom:var(--s1)}
+  .num{
+    font-family:var(--serif); font-weight:900; font-size:clamp(44px,5.6vw,84px);
+    line-height:1; letter-spacing:-.04em; font-variant-numeric:tabular-nums;
+  }
+  .num.a{color:var(--a)} .num.b{color:var(--b)}
+  .side{font-size:14px; font-weight:700; letter-spacing:.1em}
+  .track{height:2px; background:var(--rule); position:relative; margin-bottom:var(--s3)}
+  /* width ではなく transform で伸ばす（レイアウト再計算を起こさない） */
+  .fill{position:absolute; inset:0 0 0 0; transform:scaleX(0); transform-origin:left center}
+  .fill.a{background:var(--a)} .fill.b{background:var(--b)}
+  .played .fill{transition:transform 1100ms cubic-bezier(.16,1,.3,1)}
+  .tally-note{font-size:13px; color:var(--ink-2)}
+
+  /* ── 事前登録。主要ボタンは余白で隔離する ───────── */
+  .signup{display:flex; gap:var(--s2); flex-wrap:wrap; margin-top:var(--s4)}
+  .signup input{
+    flex:1 1 240px; min-width:0; font:inherit; font-size:16px; color:var(--ink);
+    background:transparent; border:0; border-bottom:1px solid var(--ink);
+    border-radius:0; padding:12px 2px;
+  }
+  .signup input::placeholder{color:var(--ink-2)}
+  .signup button{
+    font:inherit; font-size:15px; font-weight:700; color:var(--paper); cursor:pointer;
+    background:var(--ink); border:0; border-radius:2px; padding:14px 32px;
+    transition:background 200ms ease;
+  }
+  .signup button:hover{background:var(--a)}
+  .signup button[disabled]{opacity:.45; cursor:not-allowed}
+  .formnote{font-size:13px; color:var(--ink-2); margin-top:var(--s2)}
+  .formnote[data-state="error"]{color:var(--a)}
+  .formnote[data-state="done"]{color:var(--b)}
+
+  /* ── 本文セクション。5:7 と 7:5 を交互にして均等を避ける ───────── */
+  .section{padding:var(--s7) 0; display:grid; gap:var(--s5); align-items:center}
+  .section--l{grid-template-columns:5fr 7fr}
+  .section--r{grid-template-columns:7fr 5fr}
+  .section--r .section-text{order:2}
+  .section h2{margin-bottom:var(--s3)}
+  .lede{font-family:var(--serif); font-size:15px; font-weight:600; letter-spacing:.16em; margin-bottom:var(--s3)}
+
+  /* ── 約束。カードにせず、罫で区切った表として組む ───────── */
+  .promise{padding:var(--s7) 0}
+  .promise h2{margin-bottom:var(--s4)}
+  .promise dl{margin:0; display:grid; grid-template-columns:5fr 7fr; gap:0}
+  .promise dt{
+    font-family:var(--serif); font-weight:600; font-size:18px;
+    padding:var(--s3) var(--s3) var(--s3) 0; border-top:1px solid var(--rule);
+  }
+  .promise dd{
+    margin:0; color:var(--ink-2); font-size:16px;
+    padding:var(--s3) 0; border-top:1px solid var(--rule);
+  }
+
+  .disclose{padding:var(--s6) 0 var(--s7); display:grid; grid-template-columns:5fr 7fr; gap:var(--s5)}
+  .disclose h2{font-size:clamp(20px,2.2vw,26px)}
+  .disclose p{color:var(--ink-2); font-size:15px; max-width:34em; margin-bottom:var(--s2)}
+  .disclose p:last-child{margin-bottom:0}
+  .disclose strong{color:var(--ink); font-weight:700}
+
+  footer{padding:var(--s4) 0 var(--s6); font-size:14px; color:var(--ink-2); border-top:1px solid var(--rule)}
+  footer p{margin:0 0 var(--s1)}
+  footer a{color:var(--ink); text-decoration-thickness:1px; text-underline-offset:.3em}
+
+  @media (prefers-reduced-motion:reduce){ .played .fill{transition:none} }
+
+  /* ── 390px。7:5を解体し、間延びを避けて余白を圧縮 ───────── */
+  @media (max-width:860px){
+    .sheet{width:calc(100% - 40px)}
+    .hero{grid-template-columns:1fr; gap:var(--s4); padding:var(--s4) 0 var(--s5)}
+    .hero .hero-figure{order:-1}
+    .mark{margin-bottom:var(--s4)}
+    .section{grid-template-columns:1fr !important; gap:var(--s4); padding:var(--s6) 0}
+    .section--r .section-text{order:0}
+    .promise{padding:var(--s6) 0}
+    .promise dl{grid-template-columns:1fr}
+    .promise dt{padding:var(--s3) 0 var(--s1); border-top:1px solid var(--rule)}
+    .promise dd{padding:0 0 var(--s3); border-top:0}
+    .disclose{grid-template-columns:1fr; gap:var(--s3); padding:var(--s5) 0 var(--s6)}
+    .num{font-size:56px}
+  }
+</style>
+</head>
+<body>
+
+<main class="sheet">
+
+  <section class="hero">
+    <div class="hero-text">
+      <p class="mark">STYLIST</p>
+      <h1>その服、似合ってるか聞いてから買う。</h1>
+      <p class="body">
+        迷っている2パターンを出すと、みんながどっちが似合うか投票してくれます。
+        感想ではなく、票の数字で返ってきます。
+      </p>
+
+      <div class="tally" id="tally" aria-hidden="true">
+        <div class="tally-row"><span class="num a">62</span><span class="side">％　服A</span></div>
+        <div class="track"><span class="fill a" data-w="62"></span></div>
+        <div class="tally-row"><span class="num b">38</span><span class="side">％　服B</span></div>
+        <div class="track"><span class="fill b" data-w="38"></span></div>
+        <p class="tally-note">集まった票の見え方（例）</p>
+      </div>
+
+      <form class="signup" id="signup" novalidate>
+        <label for="email" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">メールアドレス</label>
+        <input id="email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="メールアドレス" required>
+        <button type="submit" id="submit">公開したら知らせて</button>
+      </form>
+      <p class="formnote" id="formnote">iOSアプリ。準備中です。登録はいつでも解除できます。</p>
+    </div>
+
+    <figure class="hero-figure">
+      <img src="img/judge.jpg" width="1100" height="1790"
+           alt="ジャッジ画面。白パンツコーデと白コート×ピンクの2枚が並び、似合う方を選ぶ">
+    </figure>
+  </section>
+
+  <hr class="rule">
+
+  <section class="section section--l">
+    <div class="section-text">
+      <p class="lede">ジャッジ</p>
+      <h2>見比べて、選ぶ。</h2>
+      <p class="body">他の人の「どっちが似合う？」に答えます。考え込む必要はありません。5人ジャッジすると、自分の結果が見られるようになります。</p>
+    </div>
+    <figure>
+      <img src="img/post.jpg" width="1110" height="1700" alt="相談を投稿する画面。写真2枚を選び、使っている服をタグ付けできる">
+      <figcaption>相談する側は、写真2枚を選ぶだけ。</figcaption>
+    </figure>
+  </section>
+
+  <section class="section section--r">
+    <div class="section-text">
+      <p class="lede">ショップ</p>
+      <h2>気になった服は、<br>そのまま買いに行ける。</h2>
+      <p class="body">写真をタップすると、その服のページへ行けます。投稿者が使った服を登録していればそれが並び、無いときは似た雰囲気の商品を並べます。探し直す手間がありません。</p>
+    </div>
+    <figure>
+      <img src="img/detail.jpg" width="1110" height="1500" alt="投稿の詳細画面。ベージュロングコートと、似ているアイテムが価格つきで並ぶ">
+      <figcaption>「PR」と表示のある箇所は提携リンクです。</figcaption>
+    </figure>
+  </section>
+
+  <section class="promise">
+    <h2>気持ちよく使うために。</h2>
+    <dl>
+      <dt>顔が写る写真は、自分のものだけ</dt>
+      <dd>他人の写真を同意なく載せることを禁止しています。はじめて開いたときに確認しています。</dd>
+      <dt>イヤな投稿はその場で消せる</dt>
+      <dd>通報すると自分の画面から即座に消え、運営が内容を確認します。特定の投稿を非表示にすることもできます。</dd>
+      <dt>自分の投稿はいつでも削除できる</dt>
+      <dd>マイページから削除すると、写真も集まった票もまとめて消えます。</dd>
+    </dl>
+  </section>
+
+  <section class="disclose">
+    <h2>広告・提携リンクについて</h2>
+    <div>
+      <p>アプリ内に表示される商品には、アフィリエイトプログラム（提携リンク）を利用したものが含まれます。リンクを経由して購入された場合、運営者に報酬が支払われることがあります。該当箇所には「PR」と表示しています。</p>
+      <p>投稿者が商品をタグ付けしていない投稿には、関連する商品を「似ているアイテム」として表示することがあります。これは<strong>その写真に写っている服そのものではありません</strong>。アプリ内でもその旨を明記しています。</p>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="sheet">
+    <p><a href="privacy.html">プライバシーポリシー</a></p>
+    <p>お問い合わせ：<a href="mailto:marumikan8789@gmail.com">marumikan8789@gmail.com</a></p>
+    <p>&copy; 2026 Stylist</p>
+  </div>
+</footer>
+
+<script>
+  // 動かすのは1箇所だけ: 票バーが 0 から実測値へ伸びる。
+  (function () {
+    var tally = document.getElementById('tally');
+    if (!tally) return;
+    var fills = tally.querySelectorAll('.fill');
+    function setAll() {
+      [].forEach.call(fills, function (el) {
+        el.style.transform = 'scaleX(' + (parseFloat(el.getAttribute('data-w')) / 100) + ')';
+      });
+    }
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setAll();
+    } else {
+      requestAnimationFrame(function () {
+        setTimeout(function () { tally.classList.add('played'); setAll(); }, 260);
+      });
+    }
+  })();
+
+  // 事前登録。Supabase に匿名で1行入れるだけ（挿入のみ許可、読み出し不可）。
+  (function () {
+    var ENDPOINT = 'https://tdmwsgkhvyxiwvygyoon.supabase.co/rest/v1/waitlist';
+    var ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRkbXdzZ2todnl4aXd2eWd5b29uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MDE4OTEsImV4cCI6MjA5NzA3Nzg5MX0.lnH2jnuWyPBOM5c7ISwL4rNb8MvYXSPqcnp-oChKpJY';
+    var form = document.getElementById('signup');
+    var input = document.getElementById('email');
+    var button = document.getElementById('submit');
+    var note = document.getElementById('formnote');
+
+    function say(text, state) {
+      note.textContent = text;
+      if (state) { note.setAttribute('data-state', state); } else { note.removeAttribute('data-state'); }
+    }
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var email = input.value.trim();
+      if (!email || email.indexOf('@') < 1 || email.lastIndexOf('.') < email.indexOf('@')) {
+        say('メールアドレスの形を確認してください（例: you@example.com）', 'error');
+        input.focus();
+        return;
+      }
+      button.disabled = true;
+      say('送信中…');
+      fetch(ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'apikey': ANON, 'Authorization': 'Bearer ' + ANON,
+          'Content-Type': 'application/json', 'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({ email: email })
+      }).then(function (res) {
+        if (res.ok || res.status === 409) {
+          form.style.display = 'none';
+          say('登録しました。公開したらこのアドレスにお知らせします。', 'done');
+        } else {
+          button.disabled = false;
+          say('うまく送れませんでした。時間をおいて試すか、下のメールアドレスまでご連絡ください。', 'error');
+        }
+      }).catch(function () {
+        button.disabled = false;
+        say('通信できませんでした。電波の良いところで試すか、下のメールアドレスまでご連絡ください。', 'error');
+      });
+    });
+  })();
+</script>
+
+</body>
+</html>
