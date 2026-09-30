@@ -303,5 +303,67 @@
   })();
 </script>
 
+
+<script type="module">
+  // Motion (MIT / free) — subtle entrance and scroll-triggered motion only.
+  // Respect reduced-motion and keep all content usable if the CDN fails.
+  import { animate, inView, stagger } from "https://cdn.jsdelivr.net/npm/motion@13.4.4/+esm";
+
+  if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    const ease = [0.16, 1, 0.3, 1];
+
+    const heroItems = document.querySelectorAll(
+      ".hero-text > .mark, .hero-text > h1, .hero-text > .body, .hero-text > .tally, .hero-text > .signup, .hero-text > .formnote"
+    );
+    heroItems.forEach((el) => {
+      el.style.opacity = "0";
+      el.style.transform = "translateY(18px)";
+    });
+
+    const heroFigure = document.querySelector(".hero-figure");
+    if (heroFigure) {
+      heroFigure.style.opacity = "0";
+      heroFigure.style.transform = "translateY(22px) scale(.985)";
+    }
+
+    requestAnimationFrame(() => {
+      animate(
+        heroItems,
+        { opacity: [0, 1], y: [18, 0] },
+        { duration: 0.72, delay: stagger(0.07), ease }
+      );
+
+      if (heroFigure) {
+        animate(
+          heroFigure,
+          { opacity: [0, 1], y: [22, 0], scale: [0.985, 1] },
+          { duration: 0.95, delay: 0.14, ease }
+        );
+      }
+    });
+
+    const revealTargets = document.querySelectorAll(
+      ".section .section-text, .section figure, .promise h2, .promise dt, .promise dd, .disclose > *"
+    );
+
+    revealTargets.forEach((el) => {
+      el.style.opacity = "0";
+      el.style.transform = "translateY(22px)";
+    });
+
+    inView(
+      revealTargets,
+      (element) => {
+        animate(
+          element,
+          { opacity: [0, 1], y: [22, 0] },
+          { duration: 0.68, ease }
+        );
+      },
+      { margin: "0px 0px -12% 0px" }
+    );
+  }
+</script>
+
 </body>
 </html>
